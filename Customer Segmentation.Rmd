@@ -1,0 +1,271 @@
+---
+title: "Customer Segmentation"
+author: "Trung Le"
+date: "February 10, 2017"
+output: html_document
+---
+
+## Overview
+
+It is very important nowadays for company to understand their customer, know the value of each customer in their business as customers are not all equal. Knowing which customers are the most valueable, company can build marketing strategy to increase thier satisfaction with lower cost and more effectively. Moreover, understanding customers behavior, company can increase revenue by sending the marketing massages to the right customer at the right time in the right place. This assginment will cover 2 topics: customer segmentation and customer behavior.
+
+## Load the data
+
+Install all the packages requirement and read the data
+
+```
+library(dplyr)
+library(gplots)
+library(ggplot2)
+library(cluster)
+library(devtools)
+install_github("hoxo-m/easyRFM")
+library(easyRFM)
+install_github("Rdatatable/data.table")
+library(data.table)
+library(cluster)
+library(fpc)
+dat <- read.csv("Superstore.csv")
+str(dat)
+```
+## Tidy the data
+
+There are many variables that are not neccessary for our purposes, so remove them. Then convert variables and solve NA observation
+
+#### Remove variable and convert variables
+```
+cust <- dat[,c(1, 6, 2:3, 14:22)]
+cust$Customer.ID <- as.character(cust$Customer.ID)
+cust$Order.ID <- as.character(cust$Order.ID)
+cust$Order.Date <-as.Date(cust$Order.Date, format = "%m/%d/%y")
+cust$Product.ID <- as.character(cust$Product.ID)
+cust$Product.Name <- as.character(cust$Product.Name)
+cust$Sales <- as.numeric(as.character(gsub(",","",cust$Sales)))
+cust$Profit <- as.numeric(as.character(gsub(",","",cust$Profit)))
+str(cust)
+```
+#### Treating missing observations
+
+There are 668 missing observation which is 1.3% of the total data. So we delete these missing observations
+```
+sum(is.na(cust$Sales))
+sum(is.na(cust$Profit))
+cust <- na.omit(cust)
+names(cust$Sub.Category)
+```
+## Feature new variables
+In order to understand customer behavior based on products they bought in the past, it is important to create new variable of product categories. We use packages 'dplyr' to feature these variable and then combines all of them into sub.cat data
+
+```
+# Phones
+Phones <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Phones = as.numeric(ifelse(Sub.Category == "Phones", 1, 0)), Phones_Num = Phones*Quantity)
+
+Phones <- Phones %>% group_by(Customer.ID) %>% select(Customer.ID, Phones_Num) %>% summarise(Phones_Num = sum(Phones_Num))
+
+# Chairs
+Chairs <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Chairs = as.numeric(ifelse(Sub.Category == "Chairs", 1, 0)), Chairs_Num = Chairs*Quantity)
+                                                                                                    
+Chairs <- Chairs %>% group_by(Customer.ID) %>% select(Customer.ID, Chairs_Num) %>% summarise(Chairs_Num = sum(Chairs_Num))                                                                                                 
+# Tables
+Tables <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Tables = as.numeric(ifelse(Sub.Category == "Tables", 1, 0)), Tables_Num = Tables*Quantity)
+
+Tables <- Tables %>% group_by(Customer.ID) %>% select(Customer.ID, Tables_Num) %>% summarise(Tables_Num = sum(Tables_Num))       
+
+# Copiers
+Copiers <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Copiers = as.numeric(ifelse(Sub.Category == "Copiers", 1, 0)), Copiers_Num = Copiers*Quantity)
+
+Copiers <- Copiers %>% group_by(Customer.ID) %>% select(Customer.ID, Copiers_Num) %>% summarise(Copiers_Num = sum(Copiers_Num))       
+
+# Bookcases
+Bookcases <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Bookcases = as.numeric(ifelse(Sub.Category == "Bookcases", 1, 0)), Bookcases_Num = Bookcases*Quantity)
+
+Bookcases <- Bookcases %>% group_by(Customer.ID) %>% select(Customer.ID, Bookcases_Num) %>% summarise(Bookcases_Num = sum(Bookcases_Num))       
+
+# Art
+Art <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Art = as.numeric(ifelse(Sub.Category == "Art", 1, 0)), Art_Num = Art*Quantity)
+
+Art <- Art %>% group_by(Customer.ID) %>% select(Customer.ID, Art_Num) %>% summarise(Art_Num = sum(Art_Num))       
+
+# Appliances
+Appliances <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Appliances = as.numeric(ifelse(Sub.Category == "Appliances", 1, 0)), Appliances_Num = Appliances*Quantity)
+
+Appliances <- Appliances %>% group_by(Customer.ID) %>% select(Customer.ID, Appliances_Num) %>% summarise(Appliances_Num = sum(Appliances_Num))       
+
+# Storage
+Storage <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Storage = as.numeric(ifelse(Sub.Category == "Storage", 1, 0)), Storage_Num = Storage*Quantity)
+
+Storage <- Storage %>% group_by(Customer.ID) %>% select(Customer.ID, Storage_Num) %>% summarise(Storage_Num = sum(Storage_Num))       
+
+# Fasteners
+Fasteners <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Fasteners = as.numeric(ifelse(Sub.Category == "Fasteners", 1, 0)), Fasteners_Num = Fasteners*Quantity)
+
+Fasteners <- Fasteners %>% group_by(Customer.ID) %>% select(Customer.ID, Fasteners_Num) %>% summarise(Fasteners_Num = sum(Fasteners_Num))       
+
+# Machines
+Machines <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Machines = as.numeric(ifelse(Sub.Category == "Machines", 1, 0)), Machines_Num = Machines*Quantity)
+
+Machines <- Machines %>% group_by(Customer.ID) %>% select(Customer.ID, Machines_Num) %>% summarise(Machines_Num = sum(Machines_Num))       
+
+# Accessories
+Accessories <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Accessories = as.numeric(ifelse(Sub.Category == "Accessories", 1, 0)), Accessories_Num = Accessories*Quantity)
+
+Accessories <- Accessories %>% group_by(Customer.ID) %>% select(Customer.ID, Accessories_Num) %>% summarise(Accessories_Num = sum(Accessories_Num))       
+
+# Furnishings
+Furnishings <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Furnishings = as.numeric(ifelse(Sub.Category == "Furnishings", 1, 0)), Furnishings_Num = Furnishings*Quantity)
+
+Furnishings <- Furnishings %>% group_by(Customer.ID) %>% select(Customer.ID, Furnishings_Num) %>% summarise(Furnishings_Num = sum(Furnishings_Num))       
+
+# Binders
+Binders <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Binders = as.numeric(ifelse(Sub.Category == "Binders", 1, 0)), Binders_Num = Binders*Quantity)
+
+Binders <- Binders %>% group_by(Customer.ID) %>% select(Customer.ID, Binders_Num) %>% summarise(Binders_Num = sum(Binders_Num))       
+
+# Labels 
+Labels <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Labels = as.numeric(ifelse(Sub.Category == "Labels", 1, 0)), Labels_Num = Labels*Quantity)
+
+Labels <- Labels %>% group_by(Customer.ID) %>% select(Customer.ID, Labels_Num) %>% summarise(Labels_Num = sum(Labels_Num))       
+
+# Supplies
+Supplies <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Supplies = as.numeric(ifelse(Sub.Category == "Supplies", 1, 0)), Supplies_Num = Supplies*Quantity)
+
+Supplies <- Supplies %>% group_by(Customer.ID) %>% select(Customer.ID, Supplies_Num) %>% summarise(Supplies_Num = sum(Supplies_Num))       
+
+# Envelopes
+Envelopes <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Envelopes = as.numeric(ifelse(Sub.Category == "Envelopes", 1, 0)), Envelopes_Num = Envelopes*Quantity)
+
+Envelopes <- Envelopes %>% group_by(Customer.ID) %>% select(Customer.ID, Envelopes_Num) %>% summarise(Envelopes_Num = sum(Envelopes_Num))   
+
+# Paper
+Paper <- cust %>% group_by(Customer.ID) %>% select(Customer.ID, Sub.Category, Quantity) %>% mutate(Paper = as.numeric(ifelse(Sub.Category == "Paper", 1, 0)), Paper_Num = Paper*Quantity)
+
+Paper <- Paper %>% group_by(Customer.ID) %>% select(Customer.ID, Paper_Num) %>% summarise(Paper_Num = sum(Paper_Num))       
+
+# combine all sub.category
+sub.cat <- cbind(Storage, Phones, Machines, Labels, Furnishings, Fasteners, Envelopes, Copiers, Chairs, Bookcases, Binders, Art, Appliances, Accessories, Tables, Supplies, Paper)
+
+sub.cat <- sub.cat[,c(1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34)]
+rm(Accessories, Appliances, Art, Binders, Bookcases, Chairs, Copiers, Envelopes, Fasteners, Furnishings, Labels, Machines, Paper, Phones, Storage, Supplies, Tables)
+```
+
+## RFM model
+We use RFM model to get groups of customer: leaved customers, leaving customers, good customers, new customers
+
+```
+RFM <- rfm_auto(cust, id="Customer.ID", payment="Sales", date="Order.Date")
+head(rfm.test$rfm)
+rfm.test$breaks
+
+# table of "RF" and "RM"
+rfm.test$get_table("RF")
+rfm.test$get_table("RM")
+
+# based on 3 variables, R, F, M, we create 4 groups of customers
+leaved_customers <- RFM$get_sliced_rfm(R_slice=1:2)
+leaving_customers <- RFM$get_sliced_rfm(R_slice=3)
+good_customers <- RFM$get_sliced_rfm(R_slice=4:5, F_slice=4:5)
+new_customers <- RFM$get_sliced_rfm(R_slice=4:5, F_slice=1:2)
+
+rfm.score <- RFM$rfm
+str(rfm.score)
+rfm.score$score <- rfm.score$RecencyClass+rfm.score$FrequencyClass+rfm.score$MonetaryClass
+rfm.score$RecencyClass <- as.factor(rfm.score$RecencyClass)
+rfm.score$FrequencyClass <- as.factor(rfm.score$FrequencyClass)
+rfm.score[1:10,]
+table(rfm.score$score)
+str(rfm.score)
+
+# create baloon plot
+balloonplot(rfm.score$RecencyClass, rfm.score$FrequencyClass, rfm.score$MonetaryClass)
+```
+## Clustering technique
+We will do clustering based on product category for each group of customer to understand the purchasing behavior of each group. Based on that we can set marketing strategy for each group of customers.
+Now we need to merge each group of customers with sub.cat data to do clustering. In order to do that, we create a variable named Cs.Type which:
+0 = leaved customers
+1 = leaving customers
+2 = Good customers
+3 = new customers
+4 = monitoring
+
+```
+sub.cat$Cs.Type <- 4
+sub.cat$Cs.Type[sub.cat$Customer.ID %in% good_customers$Customer.ID] = 2
+sub.cat$Cs.Type[sub.cat$Customer.ID %in% leaved_customers$Customer.ID] = 0
+sub.cat$Cs.Type[sub.cat$Customer.ID %in% leaving_customers$Customer.ID] = 1
+sub.cat$Cs.Type[sub.cat$Customer.ID %in% new_customers$Customer.ID] = 3
+
+# filtering to get product categories data of each group
+good.clust <- sub.cat[sub.cat$Cs.Type == 2,]
+leaved.clust <- sub.cat[sub.cat$Cs.Type == 0,]
+leaving.clust <- sub.cat[sub.cat$Cs.Type == 1,]
+new.clust <- sub.cat[sub.cat$Cs.Type == 3,]
+```
+#### K-mean clustering
+
+##### Good customer group
+```
+set.seed(1)
+good.clust <- good.clust[,-c(1,19)]
+# finding number of clusters
+wss <- (nrow(good.clust)-1)*sum(apply(good.clust,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(good.clust, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+# pick k = 4
+k1 <- kmeans(good.clust, 4)
+k1$size
+k1$centers
+
+# plot good customers cluster
+plotcluster(good.clust, k1$cluster)
+```
+##### Leaved customer group
+```
+leaved.clust <- leaved.clust[,-c(1,19)]
+# finding number of clusters
+wss <- (nrow(leaved.clust)-1)*sum(apply(leaved.clust,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(leaved.clust, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+# pick k = 7
+k2 <- kmeans(leaved.clust, 7)
+k2$size
+k2$centers
+
+# plot good customers cluster
+plotcluster(leaved.clust, k2$cluster)
+
+```
+##### Leaving customer group
+```
+leaving.clust <- leaving.clust[,-c(1,19)]
+# finding number of clusters
+wss <- (nrow(leaving.clust)-1)*sum(apply(leaving.clust,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(leaving.clust, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+# pick k = 6
+k3 <- kmeans(leaving.clust, 6)
+k3$size
+k3$centers
+
+# plot good customers cluster
+plotcluster(leaving.clust, k3$cluster)
+```
+##### New customer group
+```
+new.clust <- new.clust[,-c(1,19)]
+# finding number of clusters
+wss <- (nrow(new.clust)-1)*sum(apply(new.clust,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(new.clust, centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+
+# pick k = 10
+k4 <- kmeans(new.clust, 10)
+k4$size
+k4$centers
+
+# plot good customers cluster
+plotcluster(new.clust, k4$cluster)
+```
+
